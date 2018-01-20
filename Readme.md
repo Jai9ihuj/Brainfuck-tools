@@ -8,6 +8,6 @@ See the [documentation](Documentation.md).
 Features
 --------
 
-A translated programm checks memory boundaries and can make a `seccomp` system call on Linux.
+A translated programm checks memory boundaries and can sandbox itself using the [Seccomp](https://en.wikipedia.org/wiki/Seccomp) system call on Linux.
 
 The internal state of a translated programm can be saved and restored later.

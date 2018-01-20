@@ -70,9 +70,9 @@ def interpret(instructions, loops, memory, read = None, write = None):
 			elif instruction == "W":
 				write(memory[pointer])
 			elif instruction == "D":
-				memory[pointer] = memory[pointer] - 1 & 0xff
+				memory[pointer] = (memory[pointer] - 1) % 256
 			elif instruction == "I":
-				memory[pointer] = memory[pointer] + 1 & 0xff
+				memory[pointer] = (memory[pointer] + 1) % 256
 			elif instruction == "P":
 				if pointer == 0:
 					raise Exception("Too left")

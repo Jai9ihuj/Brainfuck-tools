@@ -3,6 +3,13 @@ Brainfuck tools
 
 Brainfuck interpreter and translator into C.
 
+It supports the [standard](http://www.muppetlabs.com/~breadbox/bf/standards.html) Brainfuck with the following implementation defined details:
+- a cell is an 8-bit unsigned integer;
+- the memory size is defined by the user;
+- moving out of the memory causes termination;
+- increment of 255 results in 0, decrement of 0 is 255;
+- terminates on EOF.
+
 Interpreter
 -----------
 
@@ -15,6 +22,7 @@ Translator
 
 Requires a sourse file name and writes the result to the standard output, supports the same command line options as the interpreter and several additional:
 - `--maximum-loop-depth`, `-l` - the maximum allowed loop depth, defaults to 125 (127 block levels, guaranteed by the C standard, minus 2 for the function and possible `switch`);
+- `--maximum-io-instructions`, `-i` - the maximum number of IO instructions, works only with `--dumpable`. Defaults to 1022 (1023 guaranteed switch cases minus 1 for one not IO case);
 - `--no-seccomp`, `-n` - don't use `seccomp`;
 - `--dumpable`, `-d` - see the next section.
 
@@ -31,12 +39,12 @@ The internal state of a Brainfuck programm consists of four elements:
 
 The first is constant, the other three can be extracted from a programm with a debugger.
 
-To make a programm dumpable, translate it with the `--dumpable` option. Since the compiler can reorder and optimize operations, it makes little sense to dump a running programm. The best moment is when the programm is blocked for IO.
+To make a programm dumpable, translate it with the `--dumpable` option and compile with `-g`. The programm can be dumped only when it's blocked for IO.
 
 The `dump.sh` script requires a process's ID:
 
 ```
-$ sudo ./dump.sh $(ps -o pid= -C a.out)
+$ sudo ./dump.sh 1328
 ```
 
 It creates two files: `numbers.txt` and `memory.bin`. The first contains the current IO operation number and memory pointer, the second is the memory dump.

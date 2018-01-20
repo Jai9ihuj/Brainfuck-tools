@@ -8,5 +8,5 @@ gdb -p $1 -batch \
 	-ex "printf \"%llu\\n%llu\\n\", position, pointer - (unsigned long long) &memory" \
 	-ex "set logging off" \
 	-ex "set max-value-size unlimited" \
-	-ex "append memory memory.bin &memory last" \
+	-ex "append memory memory.bin &memory last + 1" \
 	-ex "detach"

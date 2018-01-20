@@ -47,52 +47,44 @@ static bool execute(void) {
 """)
 
 initialize_template = string.Template("""
-	if (!error && argc != 1) {
-		if (!error) {
-			error = argc != 3;
+	if (argc != 1) {
+		if (argc != 3) {
+			goto error;
 		}
 
-		FILE *numbers_file;
+		FILE *numbers_file = fopen(argv[1], "r");
 
-		if (!error) {
-			numbers_file = fopen(argv[1], "r");
-
-			error = numbers_file == NULL;
+		if (numbers_file == NULL) {
+			goto error;
 		}
 
 		size_t shift;
 
-		if (!error) {
-			error = fscanf(numbers_file, "%zu %zu", &position, &shift) != 2;
+		bool result = fscanf(numbers_file, "%zu %zu", &position, &shift) == 2;
 
-			fclose(numbers_file);
+		fclose(numbers_file);
+
+		if (!result) {
+			goto error;
 		}
 
-		if (!error) {
-			error = (
-				position > LAST_POSITION ||
-				shift >= MEMORY_LENGTH
-			);
+		if (position > LAST_POSITION || shift >= MEMORY_LENGTH) {
+			goto error;
 		}
 
-		FILE *memory_file;
+		pointer += shift;
 
-		if (!error) {
-			pointer += shift;
+		FILE *memory_file = fopen(argv[2], "rb");
 
-			memory_file = fopen(argv[2], "rb");
-
-			error = memory_file == NULL;
+		if (memory_file == NULL) {
+			goto error;
 		}
 
-		if (!error) {
-			fread(memory, 1, MEMORY_LENGTH, memory_file);
-			fgetc(memory_file);
+		fread(memory, 1, MEMORY_LENGTH, memory_file);
+		fgetc(memory_file);
 
-			error = (
-				ferror(memory_file) != 0 ||
-				feof(memory_file) == 0
-			);
+		if (ferror(memory_file) != 0 || feof(memory_file) == 0) {
+			goto error;
 		}
 	}
 """)
@@ -119,22 +111,22 @@ static bool write_cell(const uint8_t *cell) {
 	return syscall(SYS_write, 1, cell, 1) == 1;
 }
 
-int main(int argc, char **argv) {
-	bool error = false;
-$initialize
-	if (!error) {
-		error = fclose(stderr) != 0;
+int main(int argc, char **argv) {$initialize
+	if (fclose(stderr) != 0) {
+		goto error;
 	}
 
-	if (!error) {
-		error = syscall(SYS_prctl, PR_SET_SECCOMP, SECCOMP_MODE_STRICT) != 0;
+	if (syscall(SYS_prctl, PR_SET_SECCOMP, SECCOMP_MODE_STRICT) != 0) {
+		goto error;
 	}
 
-	if (!error) {
-		error = !execute();
+	if (!execute()) {
+		goto error;
 	}
 
-	syscall(SYS_exit, error ? EXIT_FAILURE : EXIT_SUCCESS);
+	syscall(SYS_exit, EXIT_SUCCESS);
+
+	error: syscall(SYS_exit, EXIT_FAILURE);
 }
 """)
 
@@ -151,18 +143,20 @@ static bool write_cell(const uint8_t *cell) {
 	return fwrite(cell, 1, 1, stdout) == 1;
 }
 
-int main(int argc, char **argv) {
-	bool error = false;
-$initialize
-	if (!error) {
-		error = !execute();
+int main(int argc, char **argv) {$initialize
+	setbuf(stdout, NULL);
+
+	if (!execute()) {
+		goto error;
 	}
 
-	return error ? EXIT_FAILURE : EXIT_SUCCESS;
+	return EXIT_SUCCESS;
+
+	error: return EXIT_FAILURE;
 }
 """)
 
-def translate(instructions, memory_length, dumpable = False):
+def translate(instructions, maximum_IOs, memory_length, dumpable = False):
 	translated = ""
 	line_length = 0
 	new_line = "\n\t"
@@ -186,6 +180,9 @@ def translate(instructions, memory_length, dumpable = False):
 		for i in instructions:
 			if i in "RW":
 				position += 1
+
+				if position > maximum_IOs:
+					raise Exception("Too many IOs")
 
 				line_length = 0
 				append_translated("case {0:}: position = {0:};".format(position))
@@ -215,6 +212,7 @@ if __name__ == "__main__":
 
 	argument_parser.add_argument("--maximum-code-length", "-c", type = int, default = 2 ** 20)
 	argument_parser.add_argument("--maximum-loop-depth", "-l", type = int, default = 125)
+	argument_parser.add_argument("--maximum-io-instructions", "-i", type = int, default = 1022)
 	argument_parser.add_argument("--memory-length", "-m", type = int, default = 2 ** 20)
 	argument_parser.add_argument("--no-seccomp", "-n", action = "store_true")
 	argument_parser.add_argument("--dumpable", "-d", action = "store_true")
@@ -228,6 +226,9 @@ if __name__ == "__main__":
 	if arguments.maximum_loop_depth < 0:
 		raise Exception("Invalid maximum loop depth")
 
+	if arguments.maximum_io_instructions < 0:
+		raise Exception("Invalid maximum IO instructions count")
+
 	if arguments.memory_length < 1:
 		raise Exception("Invalid memory length")
 
@@ -237,7 +238,7 @@ if __name__ == "__main__":
 		instructions, loops, IOs = interpreter.parse(file, arguments.maximum_code_length, arguments.maximum_loop_depth)
 
 	sys.stdout.write(
-		translate(instructions, arguments.memory_length, arguments.dumpable) +
+		translate(instructions, arguments.maximum_io_instructions, arguments.memory_length, arguments.dumpable) +
 		(main_no_seccomp_template if arguments.no_seccomp else main_template).substitute(
 			initialize = initialize_template.substitute() if arguments.dumpable else ""
 		)
