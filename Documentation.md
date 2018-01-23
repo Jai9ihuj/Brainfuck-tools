@@ -8,7 +8,8 @@ It supports the [standard](http://www.muppetlabs.com/~breadbox/bf/standards.html
 - the memory size is defined by the user;
 - moving out of the memory causes termination;
 - increment of 255 results in 0, decrement of 0 is 255;
-- terminates on EOF.
+- terminates on EOF;
+- returns an error on unbalanced brackets.
 
 Interpreter
 -----------
